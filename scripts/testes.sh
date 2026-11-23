@@ -1,39 +1,60 @@
-
 #!/bin/bash
 
-set -e
+# Compila os programas
+echo "Compilando serial.c e paralelo.c..."
+gcc -O2 serial.c -o serial -lm || { echo "ERRO ao compilar serial.c"; exit 1; }
+mpicc -O2 paralelo.c -o paralelo -lm || { echo "ERRO ao compilar paralelo.c"; exit 1; }
+
 
 mkdir -p resultados
-
-ARQUIVO="resultados/tempos.csv"
+ARQUIVO="tempos.csv"
 
 echo "limite,processos,execucao,tempo" > "$ARQUIVO"
 
-for N in 10000000 100000000 200000000
+for N in 500000000 1000000000 2000000000
 do
+    echo "=========================================="
     echo "Testando limite: $N"
 
-    for REP in 1 2 3 4 5
+    for REP in 1 2 3
     do
-        TEMPO=$(./serial "$N" |
-            awk '/Tempo de execucao:/ {print $4}')
+        echo -n "  [Serial] Execucao $REP/3... "
+        SAIDA=$(./serial "$N" 2>&1)
+        TEMPO=$(echo "$SAIDA" | awk '/Tempo de execucao:/ {print $4}')
 
+        if [ -z "$TEMPO" ]; then
+            echo "FALHOU!"
+            echo "  Motivo: $SAIDA"
+            exit 1
+        fi
+
+        echo "${TEMPO}s"
         echo "$N,0,$REP,$TEMPO" >> "$ARQUIVO"
     done
 
     for P in 1 2 4
     do
-        echo "  MPI com $P processos"
+        echo "  [MPI - $P processo(s)]"
 
-        for REP in 1 2 3 4 5
+        for REP in 1 2 3
         do
-            TEMPO=$(mpirun -np "$P" ./paralelo "$N" |
-                awk '/Tempo de execucao:/ {print $4}')
+            echo -n "    Execucao $REP/3... "
+            SAIDA=$(mpirun --oversubscribe -np "$P" ./paralelo "$N" 2>&1)
+            TEMPO=$(echo "$SAIDA" | awk '/Tempo de execucao:/ {print $4}')
 
+            if [ -z "$TEMPO" ]; then
+                echo "FALHOU!"
+                echo "    Motivo: $SAIDA"
+                exit 1
+            fi
+
+            echo "${TEMPO}s"
             echo "$N,$P,$REP,$TEMPO" >> "$ARQUIVO"
         done
     done
 done
 
-echo "Testes concluidos!"
-echo "Resultados salvos em $ARQUIVO"
+cp "$ARQUIVO" "resultados/tempos.csv"
+
+echo "=========================================="
+echo "Concluido com sucesso! Arquivo gerado: $(pwd)/$ARQUIVO"

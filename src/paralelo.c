@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,20 +5,20 @@
 #include <math.h>
 #include <mpi.h>
 
-/* Conta os primos dentro de um intervalo */
-long long contar_primos(int inicio, int fim,
+/* Conta os primos dentro de um intervalo (suporta > 2 bilhoes) */
+long long contar_primos(long long inicio, long long fim,
                         int *primos_base, int qtd_base) {
 
     if (inicio > fim) {
         return 0;
     }
 
-    int tamanho = fim - inicio + 1;
+    long long tamanho = fim - inicio + 1;
 
     unsigned char *primo = malloc((size_t)tamanho);
 
     if (primo == NULL) {
-        fprintf(stderr, "Erro ao alocar memoria.\n");
+        fprintf(stderr, "Erro ao alocar memoria (%lld bytes).\n", tamanho);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
@@ -29,7 +28,7 @@ long long contar_primos(int inicio, int fim,
     for (int i = 0; i < qtd_base; i++) {
         long long p = primos_base[i];
 
-        long long primeiro = ((long long)inicio + p - 1) / p * p;
+        long long primeiro = (inicio + p - 1) / p * p;
 
         if (primeiro < p * p) {
             primeiro = p * p;
@@ -42,7 +41,7 @@ long long contar_primos(int inicio, int fim,
 
     long long quantidade = 0;
 
-    for (int i = 0; i < tamanho; i++) {
+    for (long long i = 0; i < tamanho; i++) {
         if (primo[i]) {
             quantidade++;
         }
@@ -72,21 +71,18 @@ int main(int argc, char *argv[]) {
     }
 
     char *fim_entrada;
-    long limite = strtol(argv[1], &fim_entrada, 10);
+    long long N = strtoll(argv[1], &fim_entrada, 10);
 
     if (argv[1][0] == '\0' || *fim_entrada != '\0' ||
-        limite < 2 || limite > INT_MAX) {
+        N < 2 || N > 100000000000LL) {
 
         if (rank == 0) {
-            printf("Erro: informe um limite entre 2 e %d.\n",
-                   INT_MAX);
+            printf("Erro: informe um limite entre 2 e 100000000000.\n");
         }
 
         MPI_Finalize();
         return 1;
     }
-
-    int N = (int)limite;
 
     MPI_Barrier(MPI_COMM_WORLD);
     double inicio_tempo = MPI_Wtime();
@@ -94,9 +90,9 @@ int main(int argc, char *argv[]) {
     int *primos_base = NULL;
     int qtd_base = 0;
 
-    int intervalo_inicio, intervalo_fim;
+    long long intervalo_inicio, intervalo_fim;
 
-    int limite_base = (int)sqrt((double)N);
+    int limite_base = (int)sqrtl((long double)N);
 
     if (rank == 0) {
 
@@ -136,23 +132,17 @@ int main(int argc, char *argv[]) {
         free(base);
 
         /* Divide os numeros entre os processos */
-        long long total = (long long)N - 1;
+        long long total = N - 1;
 
         for (int destino = 1; destino < num_processos; destino++) {
 
-            int dados[3];
+            long long dados[3];
 
-            dados[0] = (int)(
-                2 + total * destino / num_processos
-            );
+            dados[0] = 2 + total * destino / num_processos;
+            dados[1] = 2 + total * (destino + 1) / num_processos - 1;
+            dados[2] = (long long)qtd_base;
 
-            dados[1] = (int)(
-                2 + total * (destino + 1) / num_processos - 1
-            );
-
-            dados[2] = qtd_base;
-
-            MPI_Send(dados, 3, MPI_INT, destino,
+            MPI_Send(dados, 3, MPI_LONG_LONG, destino,
                      0, MPI_COMM_WORLD);
 
             MPI_Send(primos_base, qtd_base, MPI_INT,
@@ -160,22 +150,19 @@ int main(int argc, char *argv[]) {
         }
 
         intervalo_inicio = 2;
-
-        intervalo_fim = (int)(
-            2 + total / num_processos - 1
-        );
+        intervalo_fim = 2 + total / num_processos - 1;
 
     } else {
 
         /* Recebe seu intervalo e os primos basicos */
-        int dados[3];
+        long long dados[3];
 
-        MPI_Recv(dados, 3, MPI_INT, 0, 0,
+        MPI_Recv(dados, 3, MPI_LONG_LONG, 0, 0,
                  MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
         intervalo_inicio = dados[0];
         intervalo_fim = dados[1];
-        qtd_base = dados[2];
+        qtd_base = (int)dados[2];
 
         primos_base = malloc(
             (size_t)qtd_base * sizeof(int)
@@ -216,7 +203,7 @@ int main(int argc, char *argv[]) {
         double fim_tempo = MPI_Wtime();
 
         printf("===== CRIVO DE ERATOSTENES MPI =====\n");
-        printf("Limite: %d\n", N);
+        printf("Limite: %lld\n", N);
         printf("Processos: %d\n", num_processos);
         printf("Quantidade de primos: %lld\n", quantidade_total);
         printf("Tempo de execucao: %.6f segundos\n",

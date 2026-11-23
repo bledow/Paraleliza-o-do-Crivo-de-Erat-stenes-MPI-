@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,20 +13,20 @@ double tempo_atual(void) {
     return tempo.tv_sec + tempo.tv_nsec / 1e9;
 }
 
-/* Conta os primos dentro de um intervalo */
-long long contar_primos(int inicio, int fim,
+/* Conta os primos dentro de um intervalo (suporta > 2 bilhoes) */
+long long contar_primos(long long inicio, long long fim,
                         int *primos_base, int qtd_base) {
 
     if (inicio > fim) {
         return 0;
     }
 
-    int tamanho = fim - inicio + 1;
+    long long tamanho = fim - inicio + 1;
 
     unsigned char *primo = malloc((size_t)tamanho);
 
     if (primo == NULL) {
-        fprintf(stderr, "Erro ao alocar memoria.\n");
+        fprintf(stderr, "Erro ao alocar memoria (%lld bytes).\n", tamanho);
         exit(1);
     }
 
@@ -37,8 +36,7 @@ long long contar_primos(int inicio, int fim,
     for (int i = 0; i < qtd_base; i++) {
         long long p = primos_base[i];
 
-        long long primeiro =
-            ((long long)inicio + p - 1) / p * p;
+        long long primeiro = (inicio + p - 1) / p * p;
 
         if (primeiro < p * p) {
             primeiro = p * p;
@@ -51,7 +49,7 @@ long long contar_primos(int inicio, int fim,
 
     long long quantidade = 0;
 
-    for (int i = 0; i < tamanho; i++) {
+    for (long long i = 0; i < tamanho; i++) {
         if (primo[i]) {
             quantidade++;
         }
@@ -70,22 +68,19 @@ int main(int argc, char *argv[]) {
     }
 
     char *fim_entrada;
-    long limite = strtol(argv[1], &fim_entrada, 10);
+    long long N = strtoll(argv[1], &fim_entrada, 10);
 
     if (argv[1][0] == '\0' || *fim_entrada != '\0' ||
-        limite < 2 || limite > INT_MAX) {
+        N < 2 || N > 100000000000LL) {
 
-        printf("Erro: informe um limite entre 2 e %d.\n",
-               INT_MAX);
+        printf("Erro: informe um limite entre 2 e 100000000000.\n");
         return 1;
     }
-
-    int N = (int)limite;
 
     double inicio_tempo = tempo_atual();
 
     /* Encontra os primos ate a raiz de N */
-    int limite_base = (int)sqrt((double)N);
+    int limite_base = (int)sqrtl((long double)N);
 
     unsigned char *base = malloc((size_t)limite_base + 1);
 
@@ -134,7 +129,7 @@ int main(int argc, char *argv[]) {
     double fim_tempo = tempo_atual();
 
     printf("===== CRIVO DE ERATOSTENES SERIAL =====\n");
-    printf("Limite: %d\n", N);
+    printf("Limite: %lld\n", N);
     printf("Quantidade de primos: %lld\n", quantidade);
     printf("Tempo de execucao: %.6f segundos\n",
            fim_tempo - inicio_tempo);
